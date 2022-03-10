@@ -2,6 +2,7 @@ let PETTS_SERVICE = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 let PETTS_NOTIFY = "beb5483e-36e1-4688-b7f5-ea07361b26a9";
 let PETTS_WRITE = "beb5483e-36e1-4688-b7f5-ea07361b26aa";
 let PETTS_LUNG_PRESSURE = "beb5483e-36e1-4688-b7f5-ea07361b26ab";
+let PETTS_COLOR = "beb5483e-36e1-4688-b7f5-ea07361b26ac";
 const sim_state_word_lookup = ["Stable","Distress","Arrest1","Arrest2","Arrest3","Recovery","Failure","Success"]
 class PETTSDoll {
 
@@ -90,6 +91,23 @@ class PETTSDoll {
         let view = new Uint16Array(value.buffer);
         return view[0];
     })
+  }
+  writeColor(appendage, color)
+  {
+    let data = new Uint8Array(7);
+    data[0] = 6;
+    if(appendage == "HEAD") data[1] = 1;
+    else if(appendage == "LEFT_ARM") data[1] = 2;
+    else if(appendage == "RIGHT_ARM") data[1] = 3;
+    else if(appendage == "TORSO") data[1] = 4;
+    data[2] = color["brightness"]
+    data[3] = color["red"]
+    data[4] = color ["green"]
+    data[5] = color["blue"]
+    data[6] = color["white"]
+    return this.device.gatt.getPrimaryService(PETTS_SERVICE)
+    .then(service => service.getCharacteristic(PETTS_COLOR))
+    .then(characteristic =>characteristic.writeValue(data))
   }
 
     unpack_notify_data(buffer)

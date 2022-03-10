@@ -67,6 +67,13 @@
         olderData = latestData;
 
     }
+    function hex_color_to_rgb(hex_color)
+    {
+      const r = parseInt(hex_color.substr(1,2), 16)
+      const g = parseInt(hex_color.substr(3,2), 16)
+      const b = parseInt(hex_color.substr(5,2), 16)
+      return {"red":r, "green":g, "blue":b};
+    }
     const startStopUpdated = function(e)
     {
         console.log("startStopUpdated");
@@ -188,6 +195,47 @@
         $('#advance_sim_button').click(advanceSimButtonClick);
         $("#lung_pressure_button").click(lungPressureButtonClick);
         
+        $(".color_picker_hex").change(function(event){
+          let val = $(this).val();
+          if(val.length == 6 && val[0] != "#" || val.length == 7 && val[0] == "#")
+          {
+            let new_value = val;
+            if(val[0] != "#")
+            {
+              new_value = "#" + val;
+            }
+            $("#"+$(this).attr("data-for")).val(new_value)
+          }
+        });
+        $('input[type="color"]').change(function(event){
+          $('.color_picker_hex[data-for="'+$(this).attr("id")+'"]').val($(this).val())
+        });
+        $('.brightness_slider').change(function(event){
+            $('.brightness_slider_label[data-for="'+$(this).attr("data-for")+'"]').text($(this).val()+"%")
+        })
+        $('.white_slider').change(function(event){
+            $('.white_slider_label[data-for="'+$(this).attr("data-for")+'"]').text($(this).val()+"%")
+        })
+        let get_color = function(tar)
+        {
+            let color = hex_color_to_rgb($('#'+tar).val());
+            color["white"] = ($('.brightness_slider[data-for="'+tar+'"]').val()/100.0)*255.0;
+            color["brightness"] = $('.brightness_slider[data-for="'+tar+'"]').val();
+            return color;
+
+        }
+        $("#color_button").click(function(e){
+            e.preventDefault();
+            let color_head = get_color("color_head")
+            let color_arms = get_color("color_arms")
+            let color_torso = get_color("color_torso")
+            pettsDoll.writeColor("HEAD",color_head)
+            .then(_ => pettsDoll.writeColor("LEFT_ARM",color_arms))
+            .then(_ => pettsDoll.writeColor("RIGHT_ARM",color_arms))
+            .then(_ => pettsDoll.writeColor("TORSO",color_torso))
+            .then(_=> {alert("Successfully wrote colors")})
+            .catch(error => {alert(error)})
+        })
     })
   </script>
   <meta charset="utf-8">
@@ -262,6 +310,53 @@
                 <button href="#" id="lung_pressure_button" class="btn btn-primary">Change Lung Pressure</button>
             </form>
         </div>
+        <div class="row">
+            <h3>Color Testing</h3>
+        </div>
+        <div class="row">
+                PINK = #FF0F00 White = 12%
+                BLUE = #0000FF White = 31%
+            </div>
+        <div class="row">
+            <form id="color">
+                <div class="form-group" class="color_picker">
+                    <label for="color_head">Head</label>
+                    <input id="color_head" type="color" value="#ff0000">
+                    <input type="text" class="color_picker_hex" data-for="color_head" placeholder="FF0000">
+                    <label>White</label>
+                    <input type="range" min="1" max="100" value="50" class="white_slider" data-for="color_head">
+                    <label data-for="color_head" class="white_slider_label">50%</label>
+                    <label>Brightness</label>
+                    <input type="range" min="1" max="100" value="50" class="brightness_slider" data-for="color_head">
+                    <label data-for="color_head" class="brightness_slider_label">50%</label>
+                </div>
+                <div class="form-group" class="color_picker">
+                    <label for="color_arms">Arms</label>
+                    <input id="color_arms" type="color" value="#ff0000">
+                    <input type="text" class="color_picker_hex" data-for="color_arms" placeholder="FF0000">
+                    <label>White</label>
+                    <input type="range" min="1" max="100" value="50" class="white_slider" data-for="color_arms">
+                    <label data-for="color_arms" class="white_slider_label">50%</label>
+                    <label>Brightness</label>
+                    <input type="range" min="1" max="100" value="50" class="brightness_slider" data-for="color_arms">
+                    <label data-for="color_arms" class="brightness_slider_label">50%</label>
+                </div>
+                <div class="form-group" class="color_picker">
+                    <label for="color_torso">Torso</label>
+                    <input id="color_torso" type="color" value="#ff0000">
+                    <input type="text" class="color_picker_hex" data-for="color_torso" placeholder="FF0000">
+                    <label>White</label>
+                    <input type="range" min="1" max="100" value="50" class="white_slider" data-for="color_torso">
+                    <label data-for="color_torso" class="white_slider_label">50%</label>
+                    <label>Brightness</label>
+                    <input type="range" min="1" max="100" value="50" class="brightness_slider" data-for="color_torso">
+                    <label data-for="color_torso" class="brightness_slider_label">50%</label>
+                </div>
+                <button href="#" id="color_button" class="btn btn-primary">Send Colors</button>
+            </form>
+
+        </div>
     </div>
 </body>
 </html>
+
