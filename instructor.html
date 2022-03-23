@@ -48,6 +48,7 @@
     let simStartState = 0;
     let latestData = {};
     let olderData = false;
+    let stage_definitions = [];
     function onDisconnect(e)
     {
       console.log("Disconnected!");
@@ -96,6 +97,25 @@
             onDisconnect();
         }
     }
+    const changeStageButton = function(e)
+    {
+        e.preventDefault();
+        console.log("Pressed Button "+$(this).attr('data-stage-id'));
+        let stage_id = parseInt($(this).attr('data-stage-id'));
+        $el = $('.stage_parent[data-stage-id="'+stage_id+'"]');
+        let breath_duration = $el.find(".stage_breath_duration").val()
+        let duration = $el.find(".stage_duration").val()
+        //TODO: also grab the color once those are present.
+        stage_definitions[stage_id]["breath_duration_ms"] = breath_duration;
+        stage_definitions[stage_id]["duration_ms"] = duration
+        //just an example to test.
+        // stage_definitions[stage_id]["colors"]["torso"]["red"] = 0
+        // stage_definitions[stage_id]["colors"]["torso"]["green"] = 255
+        // stage_definitions[stage_id]["colors"]["torso"]["blue"] = 0
+        pettsDoll.writeSimDef(stage_id,stage_definitions[stage_id])
+        .then(_=>alert("Wrote Stage Data"))
+        .catch(error=>alert(error));
+    }
     const setSimStartState = function(new_state)
     {
         simStartState = new_state;
@@ -122,6 +142,65 @@
         .then(_ => pettsDoll.readFullLungPressure())
         .then((pressure)=>{
             $("#lung_pressure").val(pressure);
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_STABLE))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_STABLE] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_DISTRESS))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_DISTRESS] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_ARREST1))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_ARREST1] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_ARREST2))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_ARREST2] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_ARREST3))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_ARREST3] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_FAILURE))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_FAILURE] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_RECOVERY))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_RECOVERY] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_SUCCESS))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_SUCCESS] = simStageDef;
+        })
+        .then(_ => {
+            for(idx in stage_definitions)
+            {
+                let name = sim_state_word_lookup[idx];
+                let stage = stage_definitions[idx];
+                let $el = $('#stage_definitions .stage_parent[data-stage-id="'+idx+'"]');
+                if($el.attr("data-empty") === "true")
+                {
+                    console.log("empty")
+                    $el.append($("#stage_template").html());
+                    $el.find('.btn').attr('data-stage-id',idx);
+                    $el.attr("data-empty","false");
+                }
+                $el.find(".stage_name").text(name);
+                $el.find(".stage_duration").val(stage["duration_ms"])
+                $el.find(".stage_breath_duration").val(stage["breath_duration_ms"])
+                $el.find('.btn').click(changeStageButton)
+            }
         })
         .then(_ => {
             setIsConnected(true);
@@ -311,6 +390,23 @@
             </form>
         </div>
         <div class="row">
+            <h3>Stage Definitions</h3>
+        </div>
+        <div class="row">
+            <ul id="stage_definitions">
+                <li class="stage_parent" data-stage-id="0" data-empty="true">
+                    
+                </li>
+                <li class="stage_parent" data-stage-id="1" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="2" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="3" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="4" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="5" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="6" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="7" data-empty="true"></li>
+            </ul>
+        </div>
+        <div class="row">
             <h3>Color Testing</h3>
         </div>
         <div class="row">
@@ -356,6 +452,20 @@
             </form>
 
         </div>
+    </div>
+    <div style="display:none" id="stage_template">
+        <h4 class="stage_name"></h4>
+        <form>
+            <div class="form-group">
+                <label>Stage Duration (milliseconds)</label>
+                <input class="stage_duration"/>
+            </div>
+            <div class="form-group">
+                <label>Breath Duration (milliseconds)</label>
+                <input class="stage_breath_duration"/>
+            </div>
+            <a href="#" data-stage-id="0" class="btn btn-primary">Write Stage Data</a>
+        </form>
     </div>
 </body>
 </html>
