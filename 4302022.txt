@@ -1,0 +1,27 @@
+4/30/22
+
+maybe we can write a portion of the code to manually inhale and exhale vs the pressure sensor telling the pump when to inhale/exhale
+
+inhale
+
+we need to make sure trch is far enough in
+
+we need to look inside baby clear tubein trach site
+black u shaped sensor around tube
+
+take the head off and look at trach sensor
+
+maybe get a shorter thin tube
+
+trach sensor came off around the tube
+need to take the head off and use a new tie
+
+extra bite of data in js that states whether each 
+
+take black sensor off the tube and try to remove 
+
+manuall simulate trach change on instructor dash
+
+issue could be the sensor or motherbord inside the torso
+
+could replace the sensor or change trach change function
