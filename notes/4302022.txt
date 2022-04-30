@@ -25,3 +25,9 @@ manuall simulate trach change on instructor dash
 issue could be the sensor or motherbord inside the torso
 
 could replace the sensor or change trach change function
+
+arduino software install
+ben will make changes
+text on the button will change
+
+schedule a call to do walkthru of the software/program
