@@ -1,7 +1,7 @@
 <html>
 <head>
     
-    <script src=product_x.js></script>
+    <script src=PETTSDoll.js></script>
     <script
   src="https://code.jquery.com/jquery-3.6.0.min.js"
   integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
@@ -9,21 +9,470 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+  <style>
+    .stats .stat .number
+    {
+        font-size:2em;
+    }
+    .stats .stat .number.small
+    {
+        font-size:1em;
+        height: 2em;
+    }
+    .stats .stat .label
+    {
+        font-size:1em;
+    }
+    .stats .stat
+    {
+        width:250px;
+        display:inline-block;
+        min-height:6em;
+        border-radius:10px;
+        background-color:#888;
+        margin:10px;
+        padding: 10px;
+    }
+    textarea{
+      width: 100%;
+      min-height: 10em;
+    }
+    label
+    {
+      font-weight: 800;
+    }
+  </style>
+  <script>
+    let connected = false;
+    let simStartState = 0;
+    let latestData = {};
+    let olderData = false;
+    let stage_definitions = [];
+    function onDisconnect(e)
+    {
+      console.log("Disconnected!");
+        $(".connected").hide();
+        $('.working').hide();
+        $(".disconnected").show();
+        connected = false;
+    }
+    let pettsDoll = new PETTSDoll(onDisconnect)
+    const dataReceived = function(e)
+    {
+        console.log("dataReceived");
+        console.log(e);
+        let buffer = e.currentTarget.value;
+        latestData = pettsDoll.unpack_notify_data(buffer.buffer);
+        updateStats();
+        olderData = latestData;
+
+    }
+    function hex_color_to_rgb(hex_color)
+    {
+      const r = parseInt(hex_color.substr(1,2), 16)
+      const g = parseInt(hex_color.substr(3,2), 16)
+      const b = parseInt(hex_color.substr(5,2), 16)
+      return {"red":r, "green":g, "blue":b};
+    }
+    const startStopUpdated = function(e)
+    {
+        console.log("startStopUpdated");
+        console.log(e);
+        let uint32View = new Uint32Array(e.currentTarget.value.buffer);
+        simStartState = uint32View[0];
+        updateAdvanceSimButtonText();
+
+    }
+    const setIsConnected = function(is_connected)
+    {
+        if(is_connected)
+        {
+            connected = true;
+            $(".connected").show();
+            $('.working').hide();
+            $('.disconnected').hide();
+        } else
+        {
+            onDisconnect();
+        }
+    }
+    const changeStageButton = function(e)
+    {
+        e.preventDefault();
+        console.log("Pressed Button "+$(this).attr('data-stage-id'));
+        let stage_id = parseInt($(this).attr('data-stage-id'));
+        $el = $('.stage_parent[data-stage-id="'+stage_id+'"]');
+        let breath_duration = $el.find(".stage_breath_duration").val()
+        let duration = $el.find(".stage_duration").val()
+        //TODO: also grab the color once those are present.
+        stage_definitions[stage_id]["breath_duration_ms"] = breath_duration;
+        stage_definitions[stage_id]["duration_ms"] = duration
+        //just an example to test.
+        // stage_definitions[stage_id]["colors"]["torso"]["red"] = 0
+        // stage_definitions[stage_id]["colors"]["torso"]["green"] = 255
+        // stage_definitions[stage_id]["colors"]["torso"]["blue"] = 0
+        pettsDoll.writeSimDef(stage_id,stage_definitions[stage_id])
+        .then(_=>alert("Wrote Stage Data"))
+        .catch(error=>alert(error));
+    }
+    const setSimStartState = function(new_state)
+    {
+        simStartState = new_state;
+    }
+    const connectDevice = function(e)
+    {
+        e.preventDefault();
+        pettsDoll.request()
+        .then(_ =>{
+            $(".disconnected").hide();
+            $('.working').show();
+        })
+        .then(_ => pettsDoll.connect())
+        .then(_ => pettsDoll.startDataUpdateNotifications(dataReceived))
+        .then(_ => pettsDoll.startStartStopNotifications(startStopUpdated))
+        .then(_ => pettsDoll.readStartStop())
+        .then((start_value) =>{
+            console.log("Start Value is");
+            console.log(start_value)
+            let uint32View = new Uint32Array(start_value.buffer);
+            console.log(uint32View[0]);
+            setSimStartState(uint32View[0])
+        })
+        .then(_ => pettsDoll.readFullLungPressure())
+        .then((pressure)=>{
+            $("#lung_pressure").val(pressure);
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_STABLE))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_STABLE] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_DISTRESS))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_DISTRESS] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_ARREST1))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_ARREST1] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_ARREST2))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_ARREST2] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_ARREST3))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_ARREST3] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_FAILURE))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_FAILURE] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_RECOVERY))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_RECOVERY] = simStageDef;
+        })
+        .then(_ => pettsDoll.readSimDef(PETTS_STAGE_SUCCESS))
+        .then((simStageDef)=>{
+            console.log(simStageDef);
+            stage_definitions[PETTS_STAGE_SUCCESS] = simStageDef;
+        })
+        .then(_ => {
+            for(idx in stage_definitions)
+            {
+                let name = sim_state_word_lookup[idx];
+                let stage = stage_definitions[idx];
+                let $el = $('#stage_definitions .stage_parent[data-stage-id="'+idx+'"]');
+                if($el.attr("data-empty") === "true")
+                {
+                    console.log("empty")
+                    $el.append($("#stage_template").html());
+                    $el.find('.btn').attr('data-stage-id',idx);
+                    $el.attr("data-empty","false");
+                }
+                $el.find(".stage_name").text(name);
+                $el.find(".stage_duration").val(stage["duration_ms"])
+                $el.find(".stage_breath_duration").val(stage["breath_duration_ms"])
+                $el.find('.btn').click(changeStageButton)
+            }
+        })
+        .then(_ => {
+            setIsConnected(true);
+        })
+        .catch(error => {
+            setIsConnected(false);
+            alert(error);
+        })
+        console.log(e);
+    }
+    const updateAdvanceSimButtonText = function(){
+        if(simStartState == 0)
+        {
+            $('#advance_sim_button').text("Start Breathing")
+            $('#sim_state_label').text("Doll is Idle")
+        } else if(simStartState == 1)
+        {
+            $('#advance_sim_button').text("Simulate Occlusion")
+            $('#sim_state_label').text("Breathing Normally")
+        } else if(simStartState == 2)
+        {
+            $('#advance_sim_button').text("Clear Airway")
+            $('#sim_state_label').text("Occlusion Simulated")
+        } else
+        {
+            $('#advance_sim_button').text("Reset Simulation")
+            $('#sim_state_label').text("Airway Cleared")
+        }
+    }
+    const updateStats = function()
+    {
+        for(key in latestData)
+        {
+            if(!olderData || latestData[key] !== olderData[key])
+            {
+                let el = $('.stat[data-stat="'+key+'"]')
+                if(el)
+                {
+                    el.find(".number").text(latestData[key]);
+                }
+            }
+        }
+    }
+    const advanceSimButtonClick = function(e){
+        e.preventDefault();
+        let buffer = new Uint32Array(1);
+        if(simStartState == 0)
+        {
+            buffer[0] = 1;
+        } else if(simStartState == 1)
+        {
+            buffer[0] = 2;
+        } else if(simStartState == 2)
+        {
+            buffer[0] = 3;
+        } else if (simStartState == 3)
+        {
+            buffer[0] = 0;
+        }
+        pettsDoll.writeStartStop(buffer);
+    }
+    const lungPressureButtonClick = function(e){
+        e.preventDefault();
+        pettsDoll.writeFullLungPressure(parseInt($('#lung_pressure').val()))
+        .then(_=>alert("Successfully wrote Lung Pressure"))
+        .catch(error=>alert(error));
+    }
+    $(document).ready(function(e){
+        onDisconnect();
+        $("#connect").click(connectDevice);
+        $("#disconnect").click(function(e){
+            if(connected){
+                $(".connected").hide();
+                $('.working').show();
+                pettsDoll.disconnect();
+            }
+        })
+        $('#advance_sim_button').click(advanceSimButtonClick);
+        $("#lung_pressure_button").click(lungPressureButtonClick);
+        
+        $(".color_picker_hex").change(function(event){
+          let val = $(this).val();
+          if(val.length == 6 && val[0] != "#" || val.length == 7 && val[0] == "#")
+          {
+            let new_value = val;
+            if(val[0] != "#")
+            {
+              new_value = "#" + val;
+            }
+            $("#"+$(this).attr("data-for")).val(new_value)
+          }
+        });
+        $('input[type="color"]').change(function(event){
+          $('.color_picker_hex[data-for="'+$(this).attr("id")+'"]').val($(this).val())
+        });
+        $('.brightness_slider').change(function(event){
+            $('.brightness_slider_label[data-for="'+$(this).attr("data-for")+'"]').text($(this).val()+"%")
+        })
+        $('.white_slider').change(function(event){
+            $('.white_slider_label[data-for="'+$(this).attr("data-for")+'"]').text($(this).val()+"%")
+        })
+        let get_color = function(tar)
+        {
+            let color = hex_color_to_rgb($('#'+tar).val());
+            color["white"] = ($('.brightness_slider[data-for="'+tar+'"]').val()/100.0)*255.0;
+            color["brightness"] = $('.brightness_slider[data-for="'+tar+'"]').val();
+            return color;
+
+        }
+        $("#color_button").click(function(e){
+            e.preventDefault();
+            let color_head = get_color("color_head")
+            let color_arms = get_color("color_arms")
+            let color_torso = get_color("color_torso")
+            pettsDoll.writeColor("HEAD",color_head)
+            .then(_ => pettsDoll.writeColor("LEFT_ARM",color_arms))
+            .then(_ => pettsDoll.writeColor("RIGHT_ARM",color_arms))
+            .then(_ => pettsDoll.writeColor("TORSO",color_torso))
+            .then(_=> {alert("Successfully wrote colors")})
+            .catch(error => {alert(error)})
+        })
+    })
+  </script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <title>PETTS App</title>
+  <title>PETTS Instructor Dashboard</title>
 </head>
 <body>
   <div class="container">
     <div class="row">
-    <h1>PETTS App</h1>
-  </div>
+      <h1>PETTS Instructor Dashboard</h1>
+    </div>
     <div class="row">
-    <a href="instructor.html" class="btn btn-primary">Instructor Dashboard</a>
-</div>
-<div class="row">
-    <a href="student.html" class="btn btn-primary">Student Dashboard</a>
-</div>
-  </div>
-</div>
+      <a href="#" id="connect" class="disconnected btn btn-primary">Connect</a>
+      <a href="#" id="disconnect" class="connected btn btn-primary">Disconnect</a>
+    </div>
+    <div class="row working">
+      <div class="spinner-border" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+    </div>
+    <div class="row disconnected">
+        <h3>Disconnected</h3>
+    </div>
+    <div class="connected">
+        
+        <div class="row">
+          <h4>Live Readings</h4>
+        </div>
+        <div class="row">
+            <ul class="stats">
+                <li class="stat" data-stat="resp_rate">
+                    <div class="number"></div>
+                    <div class="label">Resp Rate</div>
+                </li>
+                <li class="stat" data-stat="heart_rate">
+                    <div class="number"></div>
+                    <div class="label">Heart Rate</div>
+                </li>
+                <li class="stat" data-stat="o2sat">
+                    <div class="number"></div>
+                    <div class="label">O2 Sat</div>
+                </li>
+                <li class="stat" data-stat="trach_state_word">
+                    <div class="number small"></div>
+                    <div class="label">Trach State</div>
+                </li>
+                <li class="stat" data-stat="sim_stage_word">
+                    <div class="number"></div>
+                    <div class="label">Stage</div>
+                </li>
+                <li class="stat" data-stat="pressure">
+                    <div class="number"></div>
+                    <div class="label">Pressure (mPa)</div>
+                </li>
+            </ul>
+        </div>
+        <div class="row">
+            <h3>Controls</h3>
+        </div>
+        <div class="row">
+            <h4 id="sim_state_label"></h4>
+        </div>
+        <div class="row">
+            <a href="#" class="btn btn-primary" id="advance_sim_button">Start Breathing</a>
+        </div>
+        <div class="row">
+            <form id="lung_pressure_form">
+                <div class="form-group">
+                    <label for="lung_pressure">Full Lung Pressure (mPa)</label>
+                    <input id="lung_pressure" placeholder="1000"/>
+                </div>
+                <button href="#" id="lung_pressure_button" class="btn btn-primary">Change Lung Pressure</button>
+            </form>
+        </div>
+        <div class="row">
+            <h3>Stage Definitions</h3>
+        </div>
+        <div class="row">
+            <ul id="stage_definitions">
+                <li class="stage_parent" data-stage-id="0" data-empty="true">
+                    
+                </li>
+                <li class="stage_parent" data-stage-id="1" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="2" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="3" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="4" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="5" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="6" data-empty="true"></li>
+                <li class="stage_parent" data-stage-id="7" data-empty="true"></li>
+            </ul>
+        </div>
+        <div class="row">
+            <h3>Color Testing</h3>
+        </div>
+        <div class="row">
+                PINK = #FF0F00 White = 12%
+                BLUE = #0000FF White = 31%
+            </div>
+        <div class="row">
+            <form id="color">
+                <div class="form-group" class="color_picker">
+                    <label for="color_head">Head</label>
+                    <input id="color_head" type="color" value="#ff0000">
+                    <input type="text" class="color_picker_hex" data-for="color_head" placeholder="FF0000">
+                    <label>White</label>
+                    <input type="range" min="1" max="100" value="50" class="white_slider" data-for="color_head">
+                    <label data-for="color_head" class="white_slider_label">50%</label>
+                    <label>Brightness</label>
+                    <input type="range" min="1" max="100" value="50" class="brightness_slider" data-for="color_head">
+                    <label data-for="color_head" class="brightness_slider_label">50%</label>
+                </div>
+                <div class="form-group" class="color_picker">
+                    <label for="color_arms">Arms</label>
+                    <input id="color_arms" type="color" value="#ff0000">
+                    <input type="text" class="color_picker_hex" data-for="color_arms" placeholder="FF0000">
+                    <label>White</label>
+                    <input type="range" min="1" max="100" value="50" class="white_slider" data-for="color_arms">
+                    <label data-for="color_arms" class="white_slider_label">50%</label>
+                    <label>Brightness</label>
+                    <input type="range" min="1" max="100" value="50" class="brightness_slider" data-for="color_arms">
+                    <label data-for="color_arms" class="brightness_slider_label">50%</label>
+                </div>
+                <div class="form-group" class="color_picker">
+                    <label for="color_torso">Torso</label>
+                    <input id="color_torso" type="color" value="#ff0000">
+                    <input type="text" class="color_picker_hex" data-for="color_torso" placeholder="FF0000">
+                    <label>White</label>
+                    <input type="range" min="1" max="100" value="50" class="white_slider" data-for="color_torso">
+                    <label data-for="color_torso" class="white_slider_label">50%</label>
+                    <label>Brightness</label>
+                    <input type="range" min="1" max="100" value="50" class="brightness_slider" data-for="color_torso">
+                    <label data-for="color_torso" class="brightness_slider_label">50%</label>
+                </div>
+                <button href="#" id="color_button" class="btn btn-primary">Send Colors</button>
+            </form>
+
+        </div>
+    </div>
+    <div style="display:none" id="stage_template">
+        <h4 class="stage_name"></h4>
+        <form>
+            <div class="form-group">
+                <label>Stage Duration (milliseconds)</label>
+                <input class="stage_duration"/>
+            </div>
+            <div class="form-group">
+                <label>Breath Duration (milliseconds)</label>
+                <input class="stage_breath_duration"/>
+            </div>
+            <a href="#" data-stage-id="0" class="btn btn-primary">Write Stage Data</a>
+        </form>
+    </div>
 </body>
+</html>
