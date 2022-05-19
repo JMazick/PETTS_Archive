@@ -220,14 +220,10 @@
         {
             $('#advance_sim_button').text("Simulate Occlusion")
             $('#sim_state_label').text("Breathing Normally")
-        } else if(simStartState == 2)
-        {
-            $('#advance_sim_button').text("Clear Airway")
-            $('#sim_state_label').text("Occlusion Simulated")
         } else
         {
             $('#advance_sim_button').text("Reset Simulation")
-            $('#sim_state_label').text("Airway Cleared")
+            $('#sim_state_label').text("Occlusion Simulated")
         }
     }
     const updateStats = function()
@@ -254,9 +250,6 @@
         {
             buffer[0] = 2;
         } else if(simStartState == 2)
-        {
-            buffer[0] = 3;
-        } else if (simStartState == 3)
         {
             buffer[0] = 0;
         }
